@@ -1,0 +1,10 @@
+{
+    "chrome_driver_path": "C:\\chromedriver.exe",
+    "chrome_profile_path": "%LOCALAPPDATA%\\Google\\Chrome\\User Data\\",
+    "output_dir_path": "%USERPROFILE%\\Desktop\\NokeyBotOutput",
+    "chrome_args": [],
+    "startup": {
+        "audio": true,
+        "video": true
+    }
+}

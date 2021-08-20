@@ -1,0 +1,27 @@
+{
+    "mute_odo_vdo_on_load": {
+        "type": "class",
+        "val": "HNeRed",
+        "unique": false
+    },
+    "join_ask_to_join": {
+        "type": "class",
+        "val": "NPEfkd",
+        "unique": false
+    },
+    "atendee_list_btn": {
+        "type": "xpath",
+        "val": "//*[@id=\"ow3\"]/div[1]/div/div[9]/div[3]/div[10]/div[3]/div[2]/div/div/div[2]/span/button",
+        "unique": true
+    },
+    "no_of_participants": {
+        "type": "class",
+        "val": "uGOf1d",
+        "unique": true
+    },
+    "participant_name": {
+        "type": "class",
+        "val": "ZjFb7c",
+        "unique": true
+    }
+}

@@ -1,0 +1,6 @@
+/__pycache__/
+/nokey/__pycache__/
+/.env/
+/.vscode/
+/nokey/JsonRec/*
+
