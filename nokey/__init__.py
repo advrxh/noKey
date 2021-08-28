@@ -3,6 +3,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import (
     StaleElementReferenceException,
     NoSuchElementException,
+    WebDriverException,
 )
 
 from selenium.webdriver.common.by import By
@@ -21,6 +22,7 @@ import arrow
 
 from nokey.configs import Config
 from nokey.selectors import Selectors
+from nokey.cliUtil import Util
 
 
 class Setup:
@@ -44,7 +46,8 @@ class Setup:
         self.WAIT = WebDriverWait(self.driver, 100)
 
     def run(self, meet_url):
-
+        self.url = meet_url
+        self.util = Util(meet_url)
         self.driver.get(meet_url)
         self.startup()
         self.join()
@@ -77,8 +80,9 @@ class Setup:
 
         self.driver.find_element_by_class_name("NPEfkd").click()
 
+        self.util.join_msg()
+
     def on_join(self):
-        print("Joined The meeting succesfully!")
         ElementSelector = self.selectors.SELECTORS["atendee_list_btn"]
 
         Element = self.WAIT.until(
@@ -123,7 +127,15 @@ class Setup:
         wb = xl.Workbook()
         ws = wb.active
 
-        ws.append(["Name", "Joined At", "Last Rejoin At", "Last Left At"])
+        ws.append(
+            [
+                "Name",
+                "Joined At",
+                "Last Rejoin At",
+                "Last Left At",
+                "Leave rate",
+            ]
+        )
 
         with jsonPath.open("r+", encoding="utf-8") as jsonFile:
             data = json.load(jsonFile)
@@ -135,16 +147,17 @@ class Setup:
                     data[student]["joined"],
                     data[student]["last rejoin"],
                     data[student]["left"],
+                    data[student]["leave_rate"],
                 ]
             )
 
         wb.save(xl_path)
 
-    def close(self, signum, frame):
+    def close(self):
         self.driver.close()
 
     def listen(self):
-        print("\nListening!")
+        self.util.listen()
         sleep(5)
         Num_Of_Participants_ElementSelector = self.selectors.SELECTORS[
             "no_of_participants"
@@ -156,8 +169,6 @@ class Setup:
             )
         )
 
-        print(f"\nTotal Participants : {num_El.text}\n")
-
         Names_Element_Selector = self.selectors.SELECTORS["participant_name"]
 
         NamesEl = self.WAIT.until(
@@ -166,9 +177,8 @@ class Setup:
             )
         )
 
-        print(f"Participants :\n")
         for x in NamesEl:
-            print(f"\t{x.text}")
+            self.util.newPt(x.text)
 
         participants = int(num_El.text)
         participants_names_arr = [x.text for x in NamesEl]
@@ -177,8 +187,9 @@ class Setup:
         for participant in participants_names_arr:
             participants_data[participant] = {
                 "joined": str(arrow.now().format("hh:mm-A")),
-                "last rejoin": None,
+                "last rejoin": str(arrow.now().format("hh:mm-A")),
                 "left": None,
+                "leave_rate": 0,
             }
         self.writeData(participants_data)
 
@@ -198,68 +209,73 @@ class Setup:
 
                 for i in NamesEl:
                     new_participants_name_arr.append(i.text)
-            except NoSuchElementException:
-                self.close()
-                break
+
+                if newParticipants > participants:
+                    for participant in participants_names_arr:
+                        if participant in new_participants_name_arr:
+                            new_participants_name_arr.remove(participant)
+
+                    # print("New Participants : " + ",".join(new_participants_name_arr))
+                    self.util.newPt(",".join(new_participants_name_arr))
+
+                    for newParticipant in new_participants_name_arr:
+                        if newParticipant in participants_data.keys():
+                            _ = participants_data[newParticipant]
+                            del participants_data[newParticipant]
+                            participants_data[newParticipant] = {
+                                "joined": _["joined"],
+                                "last rejoin": str(arrow.now().format("hh:mm-A")),
+                                "left": _["left"],
+                                "leave_rate": _["leave_rate"],
+                            }
+                        else:
+                            participants_data[newParticipant] = {
+                                "joined": str(arrow.now().format("hh:mm-A")),
+                                "last rejoin": None,
+                                "left": None,
+                                "leave_rate": 0,
+                            }
+                    participants = newParticipants
+                    participants_names_arr = [x.text for x in NamesEl]
+                    self.writeData(participants_data)
+
+                elif newParticipants < participants:
+
+                    uqNewPt = sorted(list(set(new_participants_name_arr)))
+
+                    left_arr = []
+
+                    for NewPt in uqNewPt:
+                        z = 0
+                        for Pt in new_participants_name_arr:
+                            if NewPt == Pt:
+                                z += 1
+                        if z > 1:
+                            new_participants_name_arr.remove(NewPt)
+
+                    for participant in participants_names_arr:
+                        if participant not in new_participants_name_arr:
+                            left_arr.append(participant)
+
+                    # print("Participant Left " + ",".join(left_arr))
+                    self.util.levPt(",".join(left_arr))
+
+                    for left in left_arr:
+                        if left in participants_data.keys():
+                            _ = participants_data[left]
+                            del participants_data[left]
+                            participants_data[left] = {
+                                "joined": _["joined"],
+                                "last rejoin": _["last rejoin"],
+                                "left": str(arrow.now().format("hh:mm-A")),
+                                "leave_rate": _["leave_rate"] + 1,
+                            }
+
+                    participants = newParticipants
+                    participants_names_arr = [x.text for x in NamesEl]
+                    self.writeData(participants_data)
             except StaleElementReferenceException:
+                continue
+            except WebDriverException:
                 self.close()
                 break
-            except TypeError:
-                self.close()
-                break
-            except Exception as e:
-                self.close()
-                break
-            except KeyboardInterrupt:
-                self.close()
-                break
-
-            if newParticipants > participants:
-                for participant in participants_names_arr:
-                    if participant in new_participants_name_arr:
-                        new_participants_name_arr.remove(participant)
-
-                print("New Participants : " + ",".join(new_participants_name_arr))
-
-                for newParticipant in new_participants_name_arr:
-                    if newParticipant in participants_data.keys():
-                        _ = participants_data[newParticipant]
-                        del participants_data[newParticipant]
-                        participants_data[newParticipant] = {
-                            "joined": _["joined"],
-                            "last rejoin": str(arrow.now().format("hh:mm-A")),
-                            "left": _["left"],
-                        }
-                    else:
-                        participants_data[newParticipant] = {
-                            "joined": str(arrow.now().format("hh:mm-A")),
-                            "last rejoin": None,
-                            "left": None,
-                        }
-                participants = newParticipants
-                participants_names_arr = [x.text for x in NamesEl]
-                self.writeData(participants_data)
-
-            elif newParticipants < participants:
-
-                left_arr = []
-
-                for participant in participants_names_arr:
-                    if participant not in new_participants_name_arr:
-                        left_arr.append(participant)
-
-                print("Participant Left " + ",".join(left_arr))
-
-                for left in left_arr:
-                    if left in participants_data.keys():
-                        _ = participants_data[left]
-                        del participants_data[left]
-                        participants_data[left] = {
-                            "joined": _["joined"],
-                            "last rejoin": _["last rejoin"],
-                            "left": str(arrow.now().format("hh:mm-A")),
-                        }
-
-                participants = newParticipants
-                participants_names_arr = [x.text for x in NamesEl]
-                self.writeData(participants_data)
